@@ -1,0 +1,85 @@
+"""
+Meeting Routes
+회의 녹음 및 관련 기능 라우트
+"""
+
+import logging
+from datetime import datetime
+from pathlib import Path
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Depends
+from fastapi.responses import JSONResponse
+
+from app.cc_slack_handlers import is_authorized_user
+from app.config.settings import get_settings
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/meeting", tags=["meeting"])
+
+
+def require_auth(request: Request) -> dict:
+    """인증 확인"""
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+@router.post("/upload")
+async def upload_recording(
+    request: Request,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_auth)
+):
+    """회의 녹음 파일 업로드"""
+    try:
+        settings = get_settings()
+
+        # 오늘 날짜 폴더 생성 (YYYYMMDD)
+        today = datetime.now().strftime("%Y%m%d")
+        meetings_dir = Path(settings.FILESYSTEM_BASE_DIR) / "meetings" / today
+        meetings_dir.mkdir(parents=True, exist_ok=True)
+
+        # 파일 저장
+        contents = await file.read()
+        file_path = meetings_dir / file.filename
+
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        logger.info(f"[MEETING] Saved: {file_path}")
+
+        return JSONResponse({
+            "status": "success",
+            "message": "Meeting recording saved",
+            "filename": f"{today}/{file.filename}",
+            "user": user.get("name")
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to upload recording: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/list")
+async def list_recordings(request: Request, user: dict = Depends(require_auth)):
+    """회의 녹음 목록 조회"""
+    # 데이터베이스나 파일 시스템에서 목록 조회
+    return {
+        "recordings": [],
+        "user": user.get("name")
+    }
+
+
+@router.get("/transcribe/{recording_id}")
+async def get_transcription(
+    recording_id: str,
+    request: Request,
+    user: dict = Depends(require_auth)
+):
+    """회의 녹음 전사 결과 조회"""
+    # 전사 결과 반환
+    return {
+        "recording_id": recording_id,
+        "transcription": "...",
+        "user": user.get("name")
+    }
