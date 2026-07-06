@@ -74,6 +74,10 @@ Electron 앱 (설정 GUI · 실시간 로그 · 대시보드)
 회사 안에서 24시간 살면서 메일·전화·문서·코드·고객 응대를 동시에 처리하고, 필요한 도메인이 생기면
 자기가 또 다른 동료를 만들어내는 시스템.
 
+<p align="center">
+  <img src="docs/img/strengths.png" width="920" alt="MOCO 핵심 강점">
+</p>
+
 ---
 
 ## Why it exists
@@ -128,10 +132,12 @@ Opus 3-티어를 갈아 끼워 비용·속도·정확도를 동시에 잡는다.
 - **선제 제안** — Dynamic Suggester(15분)가 메모리를 분석해 요청 전에 제안 → 승인 시 자동 실행
 
 ### 🏭 자동 에이전트 생성 (Agent Factory)
-MOCO가 사용 패턴을 감지해 **새 에이전트를 직접 만들어낸다.**
-- **안전장치** — 자유 코드 작성 금지, 템플릿의 5개 슬롯만 채움 → 구문 오류 불가능
-- **격리** — `generated/`에 try/except 로딩, 하나가 깨져도 서버 전체 무사
-- **6단계 검증** — 슬롯 채우기 → 임시 저장 → py_compile·격리 import → dry-run → atomic move → hot reload, + 사람 승인 게이트
+MOCO가 사용 패턴을 감지해 **새 에이전트를 직접 만들어낸다.** 자유 코드 작성의 위험은 템플릿 슬롯만
+채우게 해 원천 차단하고, 6단계 자동 검증과 사람 승인을 거쳐 재시작 없이 배포한다.
+
+<p align="center">
+  <img src="docs/img/agent_factory.png" width="880" alt="Agent Factory — 6단계 검증 파이프라인">
+</p>
 
 ### 🔌 양방향 확장성
 - **안으로** — Google Drive에 `SKILL.md`를 올리면 런타임에 능력 추가 (Skill Marketplace)
