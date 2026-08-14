@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{BOT_NAME}}</title>
+    <link rel="icon" type="image/png" href="https://a.slack-edge.com/80588/marketing/img/meta/favicon-32.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Lato', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1A1D21;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #D1D2D3;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            max-width: min(360px, 90vw);
+            height: 90vh;
+            max-height: 700px;
+            width: 100%;
+            padding: clamp(16px, 3vh, 24px);
+            background: #222529;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .avatar {
+            width: clamp(100px, 12vh, 130px);
+            height: clamp(100px, 12vh, 130px);
+            border-radius: 8px;
+            margin: 0 auto clamp(8px, 1.2vh, 12px);
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            background: #36393F;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .bot-info {
+            margin-bottom: clamp(10px, 1.5vh, 15px);
+        }
+
+        .bot-name {
+            font-size: clamp(1.4rem, 3.5vh, 2rem);
+            margin-bottom: 8px;
+            color: #FFFFFF;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .bot-affiliations {
+            margin-top: 8px;
+            text-align: left;
+        }
+
+        .affiliation-title {
+            font-size: clamp(0.8rem, 1.7vh, 0.95rem);
+            color: #FFFFFF;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .affiliation-label {
+            font-size: clamp(0.75rem, 1.6vh, 0.85rem);
+            color: #868686;
+            margin-bottom: 3px;
+            font-weight: 400;
+        }
+
+        .affiliation-value {
+            font-size: clamp(0.75rem, 1.6vh, 0.85rem);
+            color: #1D9BD1;
+            margin-bottom: 10px;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+
+        .user-debug {
+            font-size: clamp(0.7rem, 1.5vh, 0.8rem);
+            color: #606368;
+            margin-top: 8px;
+            font-weight: 300;
+            padding-top: 8px;
+            border-top: 1px solid #3F4247;
+        }
+
+        .mic-button {
+            width: clamp(54px, 8vh, 70px);
+            height: clamp(54px, 8vh, 70px);
+            border-radius: 50%;
+            border: none;
+            background: #611f69;
+            color: white;
+            font-size: clamp(26px, 4vh, 34px);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(97, 31, 105, 0.4);
+            margin: clamp(8px, 1.2vh, 12px) auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-button:hover {
+            background: #4A154B;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(97, 31, 105, 0.6);
+        }
+
+        .mic-button:active {
+            transform: translateY(0);
+        }
+
+        .mic-button:disabled {
+            background: #3F4247;
+            color: #606368;
+            cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
+        }
+
+        .mic-button:disabled:hover {
+            background: #3F4247;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .mic-button.listening {
+            background: #007A5A;
+            color: white;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 4px 12px rgba(0, 122, 90, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 4px 12px rgba(0, 122, 90, 0.6);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 8px 20px rgba(0, 122, 90, 0.8);
+            }
+        }
+
+        .status {
+            margin: clamp(8px, 1vh, 12px) 0;
+            font-size: clamp(0.9rem, 2vh, 1.1rem);
+            min-height: clamp(25px, 3vh, 35px);
+            color: #D1D2D3;
+            font-weight: 400;
+        }
+
+        .transcript {
+            background: #36393F;
+            border: 1px solid #4A4D53;
+            padding: clamp(12px, 1.5vh, 18px);
+            border-radius: 8px;
+            min-height: clamp(60px, 8vh, 90px);
+            margin: clamp(10px, 1.5vh, 15px) 0;
+            font-size: clamp(0.9rem, 2vh, 1.1rem);
+            line-height: 1.5;
+            color: #E8E8E8;
+            text-align: left;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .transcript.interim {
+            opacity: 0.6;
+            font-style: italic;
+            color: #B0B3B8;
+        }
+
+        .info {
+            font-size: clamp(0.75rem, 1.6vh, 0.9rem);
+            color: #868686;
+            margin-top: clamp(10px, 1.5vh, 15px);
+            font-weight: 400;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #36393F;
+            border: 1px solid #4A4D53;
+            font-size: 0.75em;
+            font-weight: 600;
+            color: #B0B3B8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .connection-status.connected {
+            background: #007A5A;
+            color: white;
+            border-color: #007A5A;
+        }
+
+        .connection-status.connected::before {
+            content: '● ';
+            font-size: 1.2em;
+        }
+
+        .connection-status.disconnected {
+            background: #E01E5A;
+            color: white;
+            border-color: #E01E5A;
+        }
+
+        .connection-status.disconnected::before {
+            content: '● ';
+            font-size: 1.2em;
+        }
+
+        .meeting-controls {
+            margin: clamp(10px, 1.5vh, 15px) 0;
+            width: 100%;
+        }
+
+        .meeting-btn {
+            width: 100%;
+            padding: clamp(10px, 1.5vh, 14px);
+            background: #36393F;
+            border: 2px solid #4A4D53;
+            border-radius: 8px;
+            color: #D1D2D3;
+            font-size: clamp(0.9rem, 2vh, 1.1rem);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .meeting-btn:hover {
+            background: #3F4247;
+        }
+
+        .meeting-btn .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #868686;
+            transition: all 0.2s ease;
+        }
+
+        .meeting-btn.recording {
+            background: #36393F;
+            border-color: #E01E5A;
+            color: #FFFFFF;
+        }
+
+        .meeting-btn.recording:hover {
+            background: #3F4247;
+            border-color: #C01E49;
+        }
+
+        .meeting-btn.recording .status-dot {
+            background: #E01E5A;
+            animation: pulse 1.5s infinite;
+        }
+
+        .meeting-btn .timer-text {
+            font-family: monospace;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        /* 작은 화면 대응 */
+        @media (max-width: 400px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                height: 95vh;
+                padding: 12px;
+                border-radius: 8px;
+            }
+
+            .avatar {
+                width: 100px;
+                height: 100px;
+            }
+
+            .bot-name {
+                font-size: 1.2rem;
+            }
+
+            .mic-button {
+                width: 56px;
+                height: 56px;
+                font-size: 26px;
+            }
+
+            .connection-status {
+                top: 5px;
+                right: 5px;
+                padding: 4px 8px;
+                font-size: 0.7em;
+            }
+        }
+
+        /* 높이가 낮은 화면 대응 */
+        @media (max-height: 600px) {
+            .container {
+                height: 98vh;
+                padding: 10px;
+            }
+
+            .avatar {
+                width: 80px;
+                height: 80px;
+                margin-bottom: 8px;
+            }
+
+            .bot-info {
+                margin-bottom: 8px;
+            }
+
+            .mic-button {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+                margin: 8px auto;
+            }
+
+            .transcript {
+                min-height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">연결 중...</div>
+
+    <div class="container">
+        <div class="avatar">
+            <img src="{{BOT_PROFILE_IMAGE}}" alt="Bot Avatar">
+        </div>
+
+        <div class="bot-info">
+            <div class="bot-name">{{BOT_NAME}}</div>
+            <div class="bot-affiliations">
+                <div class="affiliation-title">Affiliations</div>
+                <div class="affiliation-label">Department</div>
+                <div class="affiliation-value">{{BOT_ORGANIZATION}}</div>
+            </div>
+            <div class="user-debug">현재 사용자: {{USER_NAME}}</div>
+        </div>
+
+        <button class="mic-button" id="micButton">🎤</button>
+
+        <div class="status" id="status">마이크 버튼을 눌러 말씀해주세요</div>
+
+        <div class="meeting-controls">
+            <button class="meeting-btn" id="meetingButton">
+                <span class="status-dot"></span>
+                <span id="meetingButtonText">회의 녹음 시작</span>
+            </button>
+        </div>
+
+        <div class="transcript" id="transcript"></div>
+
+        <div class="info">💡 Web Speech API를 사용합니다 (Chrome 권장)</div>
+    </div>
+
+    <script>
+        // ========== 상수 ==========
+        const CLOVA_ENABLED = '{{CLOVA_ENABLED}}';
+        const DEBOUNCE_DELAY = 5000;  // 5초
+        const MIN_MEETING_DURATION = 10;  // 10초 (테스트용)
+        const DEFAULT_STATUS_TEXT = '마이크 버튼을 눌러 말씀해주세요';
+
+        // ========== 전역 변수 ==========
+        // WebSocket & 음성 인식
+        let ws = null;
+        let recognition = null;
+        let isListening = false;
+        let currentUser = null;
+        let debounceTimer = null;
+        let pendingText = '';
+
+        // 회의 녹음
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let meetingStartTime = null;
+        let meetingTimerInterval = null;
+        let isRecording = false;
+        let shouldSaveMeeting = false;
+
+        // DOM 요소
+        const micButton = document.getElementById('micButton');
+        const meetingButton = document.getElementById('meetingButton');
+        const meetingButtonText = document.getElementById('meetingButtonText');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+        const connectionStatusDiv = document.getElementById('connectionStatus');
+
+        // ========== 유틸리티 함수 ==========
+
+        function updateStatus(text, autoReset = false, resetDelay = 3000) {
+            statusDiv.textContent = text;
+            if (autoReset) {
+                setTimeout(() => {
+                    if (statusDiv.textContent === text) {
+                        statusDiv.textContent = DEFAULT_STATUS_TEXT;
+                    }
+                }, resetDelay);
+            }
+        }
+
+        function clearDebounceTimer() {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+                debounceTimer = null;
+                pendingText = '';
+                console.log('[Debounce] Cleared pending message');
+            }
+        }
+
+        function stopAudioStream(stream) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // ========== 사용자 인증 ==========
+
+        async function fetchUserInfo() {
+            try {
+                const response = await fetch('/auth/status');
+                const data = await response.json();
+                if (data.logged_in) {
+                    currentUser = data.user;
+                    console.log('[USER] Logged in as:', currentUser.name);
+                } else {
+                    console.error('[USER] Not logged in');
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('[USER] Error fetching user info:', error);
+            }
+        }
+
+        // ========== WebSocket ==========
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/voice`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('[WS] Connected');
+                connectionStatusDiv.textContent = '연결됨';
+                connectionStatusDiv.className = 'connection-status connected';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('[WS] Received:', data);
+
+                if (data.type === 'processed') {
+                    updateStatus('✅ ' + data.message, true);
+                } else if (data.type === 'error') {
+                    updateStatus('❌ 오류: ' + data.message, true);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('[WS] Disconnected');
+                connectionStatusDiv.textContent = '연결 끊김';
+                connectionStatusDiv.className = 'connection-status disconnected';
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('[WS] Error:', error);
+            };
+        }
+
+        // ========== 음성 인식 ==========
+
+        function initSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window)) {
+                updateStatus('❌ 이 브라우저는 음성 인식을 지원하지 않습니다. Chrome을 사용해주세요.');
+                micButton.disabled = true;
+                return;
+            }
+
+            recognition = new webkitSpeechRecognition();
+            recognition.lang = 'ko-KR';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                console.log('[Speech] Started');
+                isListening = true;
+                micButton.classList.add('listening');
+                updateStatus('🎤 듣고 있습니다...');
+                transcriptDiv.textContent = '';
+                transcriptDiv.className = 'transcript interim';
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                if (interimTranscript) {
+                    transcriptDiv.textContent = interimTranscript;
+                    transcriptDiv.className = 'transcript interim';
+                }
+
+                if (finalTranscript) {
+                    console.log('[Speech] Final:', finalTranscript);
+                    transcriptDiv.textContent = finalTranscript;
+                    transcriptDiv.className = 'transcript';
+
+                    pendingText = finalTranscript;
+                    clearDebounceTimer();
+
+                    updateStatus('⏱️ 5초 후 전송됩니다...');
+                    debounceTimer = setTimeout(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN && pendingText) {
+                            ws.send(JSON.stringify({
+                                type: 'voice_text',
+                                text: pendingText,
+                                is_final: true,
+                                user: currentUser
+                            }));
+                            pendingText = '';
+                            updateStatus('✅ 전송됨', true, 5000);
+                        }
+                    }, DEBOUNCE_DELAY);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('[Speech] Error:', event.error);
+                updateStatus('❌ 음성 인식 오류: ' + event.error, true);
+                stopListening();
+            };
+
+            recognition.onend = () => {
+                console.log('[Speech] Ended');
+                stopListening();
+            };
+        }
+
+        function startListening() {
+            if (recognition && !isListening) {
+                clearDebounceTimer();
+                recognition.start();
+            }
+        }
+
+        function stopListening() {
+            isListening = false;
+            micButton.classList.remove('listening');
+            if (statusDiv.textContent.includes('듣고 있습니다')) {
+                updateStatus(DEFAULT_STATUS_TEXT);
+            }
+        }
+
+        micButton.addEventListener('click', () => {
+            if (!isListening) {
+                startListening();
+            } else {
+                if (recognition) {
+                    recognition.stop();
+                }
+            }
+        });
+
+        // ========== 회의 녹음 ==========
+
+        function resetMeetingUI() {
+            meetingButton.classList.remove('recording');
+            meetingButtonText.textContent = '회의 녹음 시작';
+            micButton.disabled = false;
+            updateStatus(DEFAULT_STATUS_TEXT);
+            transcriptDiv.textContent = '';
+        }
+
+        function cleanupMeetingResources() {
+            if (mediaRecorder && mediaRecorder.stream) {
+                stopAudioStream(mediaRecorder.stream);
+            }
+            if (meetingTimerInterval) {
+                clearInterval(meetingTimerInterval);
+                meetingTimerInterval = null;
+            }
+            isRecording = false;
+            audioChunks = [];
+            meetingStartTime = null;
+            shouldSaveMeeting = false;  // 마지막에 리셋
+        }
+
+        async function startMeeting() {
+            try {
+                // 음성 인식 중지 및 디바운스 타이머 취소
+                if (recognition && isListening) {
+                    recognition.stop();
+                }
+                clearDebounceTimer();
+
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    console.log('[Meeting] Recording stopped');
+
+                    // 저장 여부 체크 (cleanup 전에)
+                    const needsSave = shouldSaveMeeting;
+
+                    await processMeeting();
+
+                    // 처리 완료 후 리소스 정리
+                    cleanupMeetingResources();
+
+                    // 저장하지 않았으면 UI 초기화
+                    if (!needsSave) {
+                        resetMeetingUI();
+                        updateStatus(`회의 녹음이 ${MIN_MEETING_DURATION}초 미만이면 저장되지 않습니다.`, true, 5000);
+                        transcriptDiv.textContent = '';
+                    }
+                };
+
+                mediaRecorder.start();
+                meetingStartTime = Date.now();
+                isRecording = true;
+                shouldSaveMeeting = false;  // 시작 시 false, 종료 시 결정
+
+                meetingButton.classList.add('recording');
+                meetingButtonText.innerHTML = '⏹️ 회의 녹음 종료 <span class="timer-text">(00:00)</span>';
+                micButton.disabled = true;
+                updateStatus('🎙️ 회의 녹음 중...');
+                transcriptDiv.textContent = '회의가 진행 중입니다. 다시 버튼을 눌러 회의를 종료하고 회의록을 생성하세요.';
+                transcriptDiv.className = 'transcript interim';
+
+                meetingTimerInterval = setInterval(updateMeetingTimer, 1000);
+
+                console.log('[Meeting] Recording started');
+
+            } catch (error) {
+                console.error('[Meeting] Error starting:', error);
+                alert('마이크 접근 권한이 필요합니다.');
+            }
+        }
+
+        function stopMeeting() {
+            if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+
+            const elapsed = Math.floor((Date.now() - meetingStartTime) / 1000);
+
+            if (elapsed < MIN_MEETING_DURATION) {
+                // 1분 미만 - 저장하지 않음
+                shouldSaveMeeting = false;
+                mediaRecorder.stop();
+                // cleanup은 onstop 이벤트에서 처리됨
+                return;
+            }
+
+            // 1분 이상 - 저장 진행
+            shouldSaveMeeting = true;
+
+            // UI 먼저 업데이트
+            meetingButton.classList.remove('recording');
+            meetingButtonText.textContent = '회의 녹음 시작';
+            micButton.disabled = false;
+            updateStatus('⏳ 회의 파일 처리 중...');
+
+            // stop()은 비동기로 onstop 이벤트 트리거 → processMeeting() 호출
+            mediaRecorder.stop();
+        }
+
+        async function processMeeting() {
+            // 저장하지 않아야 하는 경우 (1분 미만) - 조기 리턴
+            if (!shouldSaveMeeting) {
+                console.log('[Meeting] Skipping save (duration too short)');
+                return;
+            }
+
+            try {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const fileSize = (audioBlob.size / 1024 / 1024).toFixed(2);
+
+                console.log(`[Meeting] Audio size: ${fileSize} MB`);
+
+                const formData = new FormData();
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                formData.append('file', audioBlob, `meeting_${timestamp}.webm`);
+
+                updateStatus('📤 회의 파일 저장 중...');
+
+                const response = await fetch('/meeting/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    updateStatus('정상적으로 저장됐습니다.', true, 5000);
+                    transcriptDiv.textContent = `meetings/${result.filename}`;
+                    transcriptDiv.className = 'transcript';
+                } else {
+                    throw new Error(result.message || '저장 실패');
+                }
+
+            } catch (error) {
+                console.error('[Meeting] Error saving:', error);
+                updateStatus('❌ 파일 저장 실패: ' + error.message, true, 5000);
+            }
+        }
+
+        function updateMeetingTimer() {
+            if (!meetingStartTime || !isRecording) return;
+
+            const elapsed = Math.floor((Date.now() - meetingStartTime) / 1000);
+            const timeString = formatTime(elapsed);
+
+            meetingButtonText.innerHTML = `⏹️ 회의 녹음 종료 <span class="timer-text">(${timeString})</span>`;
+        }
+
+        meetingButton.addEventListener('click', () => {
+            if (!isRecording) {
+                startMeeting();
+            } else {
+                stopMeeting();
+            }
+        });
+
+        // ========== 페이지 언로드 시 정리 ==========
+
+        window.addEventListener('beforeunload', () => {
+            // 회의 녹음 중이면 정리
+            if (isRecording && mediaRecorder) {
+                cleanupMeetingResources();
+            }
+            // WebSocket 연결 종료
+            if (ws) {
+                ws.close();
+            }
+        });
+
+        // ========== 초기화 ==========
+
+        // CLOVA 설정에 따라 회의 버튼 표시/숨김
+        if (CLOVA_ENABLED !== 'true') {
+            const meetingControls = document.querySelector('.meeting-controls');
+            if (meetingControls) {
+                meetingControls.style.display = 'none';
+            }
+        }
+
+        fetchUserInfo();
+        connectWebSocket();
+        initSpeechRecognition();
+    </script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOCO Voice - 아웃바운드</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#0F1117;color:#E2E4E9;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+.container{max-width:520px;width:100%;padding:24px}
+.logo{text-align:center;font-size:28px;font-weight:700;background:linear-gradient(135deg,#5B5FC7,#8B5CF6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:20px 0 4px}
+.subtitle{text-align:center;color:#6B7280;font-size:13px;margin-bottom:30px}
+
+.setup-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px;margin-bottom:20px}
+.setup-card h3{font-size:14px;color:#8B5CF6;margin-bottom:16px;letter-spacing:1px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#9ca3af;margin-bottom:5px}
+.field input,.field textarea{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;font-family:inherit;font-size:14px;outline:none}
+.field input:focus,.field textarea:focus{border-color:#8B5CF780}
+.field textarea{resize:none;height:70px}
+
+.btn-call{width:100%;padding:13px;background:linear-gradient(135deg,#22C55E,#16A34A);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.btn-call:hover{transform:scale(1.02)}
+.btn-call:disabled{opacity:0.5;cursor:wait}
+
+.call-area{display:none}
+.call-area.active{display:block}
+.mic-area{text-align:center;margin:20px 0}
+.mic-btn{width:100px;height:100px;border-radius:50%;border:none;cursor:pointer;font-size:36px;transition:all 0.3s;outline:none}
+.mic-btn.idle{background:linear-gradient(135deg,#5B5FC7,#8B5CF6);box-shadow:0 8px 32px rgba(91,95,199,0.3)}
+.mic-btn.recording{background:linear-gradient(135deg,#EF4444,#F87171);animation:pulse 1.5s infinite}
+.mic-btn.processing{background:#374151;opacity:0.7;cursor:wait}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 20px rgba(239,68,68,0)}}
+.status{text-align:center;font-size:13px;color:#9CA3AF;margin-top:12px;min-height:18px}
+.chat-log{margin-top:20px;max-height:400px;overflow-y:auto}
+.chat-bubble{padding:10px 14px;border-radius:14px;margin-bottom:8px;font-size:14px;line-height:1.5;max-width:85%;word-break:break-word}
+.chat-bubble.user{background:#1E293B;margin-left:auto;border-bottom-right-radius:4px}
+.chat-bubble.ai{background:#5B5FC720;border:1px solid #5B5FC740;border-bottom-left-radius:4px}
+.chat-bubble .label{font-size:10px;font-weight:600;text-transform:uppercase;color:#6B7280;margin-bottom:3px}
+.end-btn{display:block;margin:20px auto;padding:8px 24px;background:transparent;border:1px solid #EF444480;border-radius:20px;color:#EF4444;font-size:12px;cursor:pointer}
+.end-btn:hover{background:#EF444420}
+.patient-info{background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#d1d5db}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">MOCO Voice Out</div>
+  <div class="subtitle">환자 재처방 안내 아웃바운드</div>
+
+  <!-- 환자 정보 입력 -->
+  <div class="setup-card" id="setupArea">
+    <h3>환자 정보</h3>
+    <div class="field">
+      <label>환자 이름</label>
+      <input type="text" id="patientName" placeholder="예: 김영숙">
+    </div>
+    <div class="field">
+      <label>처방 병원</label>
+      <input type="text" id="hospital" placeholder="예: OO병원">
+    </div>
+    <div class="field">
+      <label>담당의</label>
+      <input type="text" id="doctor" placeholder="예: 박OO 교수">
+    </div>
+    <div class="field">
+      <label>처방 제품</label>
+      <input type="text" id="product" value="제품A" placeholder="예: 제품A">
+    </div>
+    <div class="field">
+      <label>처방 만료일</label>
+      <input type="date" id="expiryDate">
+    </div>
+    <div class="field">
+      <label>전화 목적 / 추가 안내사항</label>
+      <textarea id="callPurpose" placeholder="예: 재처방 기간이 7일 남았으므로 병원 방문 안내. 처방코드 재등록 방법 안내."></textarea>
+    </div>
+    <button class="btn-call" id="startBtn" onclick="startOutbound()">📞 통화 시작</button>
+  </div>
+
+  <!-- 통화 화면 -->
+  <div class="call-area" id="callArea">
+    <div class="patient-info" id="patientInfoDisplay"></div>
+    <div class="mic-area">
+      <button class="mic-btn idle" id="micBtn" onclick="toggleSession()">🎤</button>
+    </div>
+    <div class="status" id="status">AI가 먼저 안내를 시작합니다...</div>
+    <div class="chat-log" id="chatLog"></div>
+    <button class="end-btn" onclick="endSession()">통화 종료</button>
+  </div>
+</div>
+
+<script>
+let sessionActive = false;
+let isRecording = false;
+let conversationContext = '';
+let patientInfo = {};
+let recCtx=null,recSource=null,recWorklet=null,analyser=null,pcmChunks=[];
+
+const micBtn = document.getElementById('micBtn');
+const status = document.getElementById('status');
+const chatLog = document.getElementById('chatLog');
+
+async function startOutbound() {
+  const name = document.getElementById('patientName').value.trim();
+  const hospital = document.getElementById('hospital').value.trim();
+  const doctor = document.getElementById('doctor').value.trim();
+  const product = document.getElementById('product').value.trim();
+  const expiry = document.getElementById('expiryDate').value;
+  const purpose = document.getElementById('callPurpose').value.trim();
+
+  if (!name) { alert('환자 이름을 입력해주세요.'); return; }
+
+  patientInfo = { name, hospital, doctor, product, expiry, purpose };
+
+  // UI 전환
+  document.getElementById('setupArea').style.display = 'none';
+  document.getElementById('callArea').classList.add('active');
+  document.getElementById('patientInfoDisplay').innerHTML =
+    `<strong>${name}</strong> 환자 | ${hospital} ${doctor} | ${product} | 만료: ${expiry||'미정'}`;
+
+  // AI 첫 멘트 생성 및 재생
+  sessionActive = true;
+  const greeting = `안녕하세요 ${name}님, 제품A 고객지원센터입니다. ${hospital} ${doctor} 선생님 처방으로 이용 중이신 제품A 관련하여 안내드릴 사항이 있어 연락드렸습니다.`;
+  addBubble('상담원', greeting, 'ai');
+  conversationContext = `상담원: ${greeting}\n`;
+
+  // TTS로 재생
+  try {
+    const resp = await fetch('/voice-chat-out/greet', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: greeting}),
+    });
+    if (resp.ok) {
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const player = new Audio(url);
+      player.onended = () => {
+        URL.revokeObjectURL(url);
+        micBtn.className = 'mic-btn recording';
+        status.textContent = '환자분 응답을 기다리는 중...';
+        startListening();
+      };
+      player.play();
+      status.textContent = '🔊 안내 멘트 재생 중...';
+    } else {
+      startListening();
+    }
+  } catch(e) {
+    startListening();
+  }
+}
+
+function toggleSession() {
+  if (sessionActive && isRecording) {
+    stopRecording(true);
+  } else if (sessionActive && !isRecording) {
+    startListening();
+  }
+}
+
+async function endSession() {
+  sessionActive = false;
+  if (isRecording) stopRecording(false);
+  micBtn.className = 'mic-btn idle';
+  status.textContent = '통화 종료';
+  addBubble('시스템', '통화가 종료되었습니다.', 'ai');
+
+  // Slack 요약
+  if (conversationContext.trim().length > 10) {
+    try {
+      const summary = `[아웃바운드] ${patientInfo.name} 환자 (${patientInfo.hospital})\n목적: ${patientInfo.purpose||'재처방 안내'}\n\n${conversationContext}`;
+      await fetch('/voice-chat-out/end-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conversation: summary}),
+      });
+      addBubble('시스템', '✅ Slack에 통화 요약이 전송되었습니다.', 'ai');
+    } catch(e) {}
+  }
+  conversationContext = '';
+}
+
+async function startListening() {
+  if (!sessionActive) return;
+  await startRecording();
+  detectSilence();
+}
+
+function detectSilence() {
+  if (!recCtx || !analyser) return;
+  const data = new Uint8Array(analyser.fftSize);
+  let silenceStart=null, speaking=false;
+  function check() {
+    if (!sessionActive || !isRecording) return;
+    analyser.getByteTimeDomainData(data);
+    let sum=0;
+    for(let i=0;i<data.length;i++) sum+=Math.abs(data[i]-128);
+    const avg=sum/data.length;
+    if(avg>3){speaking=true;silenceStart=null;status.textContent='🎙️ 듣고 있습니다...';}
+    else if(speaking&&!silenceStart){silenceStart=Date.now();}
+    else if(speaking&&silenceStart&&Date.now()-silenceStart>2000){speaking=false;silenceStart=null;stopRecording(true);return;}
+    requestAnimationFrame(check);
+  }
+  check();
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{channelCount:1}});
+    recCtx = new AudioContext({sampleRate:16000});
+    recSource = recCtx.createMediaStreamSource(stream);
+    analyser = recCtx.createAnalyser(); analyser.fftSize=2048;
+    recSource.connect(analyser);
+    await recCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([`class P extends AudioWorkletProcessor{process(i){const d=i[0][0];if(d)this.port.postMessage(d);return true;}}registerProcessor('p',P);`],{type:'application/javascript'})));
+    recWorklet = new AudioWorkletNode(recCtx,'p');
+    pcmChunks=[];
+    recWorklet.port.onmessage=e=>pcmChunks.push(new Float32Array(e.data));
+    recSource.connect(recWorklet);recWorklet.connect(recCtx.destination);
+    isRecording=true;
+    micBtn.className='mic-btn recording';
+    micBtn.textContent='⏹️';
+  } catch(e){status.textContent='마이크 권한이 필요합니다';}
+}
+
+function stopRecording(autoSend) {
+  if(recWorklet){recWorklet.disconnect();recWorklet=null;}
+  if(recSource){recSource.mediaStream.getTracks().forEach(t=>t.stop());recSource.disconnect();recSource=null;}
+  analyser=null;
+  const sr=recCtx?recCtx.sampleRate:16000;
+  if(recCtx){recCtx.close();recCtx=null;}
+  isRecording=false;
+  if(autoSend&&pcmChunks.length>0) processAudio(sr);
+}
+
+function float32ToWav(samples,sr){
+  const buf=new ArrayBuffer(44+samples.length*2);const v=new DataView(buf);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF');v.setUint32(4,36+samples.length*2,true);w(8,'WAVE');
+  w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  w(36,'data');v.setUint32(40,samples.length*2,true);
+  for(let i=0;i<samples.length;i++){const s=Math.max(-1,Math.min(1,samples[i]));v.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);}
+  return new Blob([v],{type:'audio/wav'});
+}
+
+async function processAudio(sr) {
+  const total=pcmChunks.reduce((s,b)=>s+b.length,0);
+  const merged=new Float32Array(total);let off=0;
+  for(const c of pcmChunks){merged.set(c,off);off+=c.length;}
+  const audioBlob=float32ToWav(merged,sr);
+
+  const formData=new FormData();
+  formData.append('audio',audioBlob,'recording.wav');
+  formData.append('context',conversationContext);
+  formData.append('patient_name',patientInfo.name);
+  formData.append('hospital',patientInfo.hospital);
+  formData.append('doctor',patientInfo.doctor);
+  formData.append('product',patientInfo.product);
+  formData.append('expiry_date',patientInfo.expiry||'');
+  formData.append('call_purpose',patientInfo.purpose||'');
+
+  micBtn.className='mic-btn processing';
+  micBtn.textContent='⏳';
+  status.textContent='🎵 응답 준비 중...';
+
+  try {
+    const resp = await fetch('/voice-chat-out/process',{method:'POST',body:formData});
+    const ct=resp.headers.get('Content-Type')||'';
+    if(ct.includes('application/json')){const err=await resp.json();throw new Error(err.error||'실패');}
+
+    const userText=decodeHeader(resp.headers.get('X-User-Text'))||'';
+    const aiText=decodeHeader(resp.headers.get('X-AI-Text'))||'';
+    if(userText) addBubble('환자',userText,'user');
+    if(aiText) addBubble('상담원',aiText,'ai');
+    conversationContext+=`환자: ${userText}\n상담원: ${aiText}\n`;
+    if(conversationContext.length>2000) conversationContext=conversationContext.slice(-1500);
+
+    const blob=await resp.blob();const url=URL.createObjectURL(blob);
+    const player=new Audio(url);
+    player.onended=()=>{
+      URL.revokeObjectURL(url);
+      if(sessionActive){micBtn.className='mic-btn recording';micBtn.textContent='⏹️';startListening();}
+      else{micBtn.className='mic-btn idle';micBtn.textContent='🎤';}
+    };
+    player.play();
+    status.textContent='🔊 응답 재생 중...';
+  } catch(e) {
+    status.textContent=e.message;
+    if(sessionActive){setTimeout(()=>{micBtn.className='mic-btn recording';startListening();},2000);}
+    else{micBtn.className='mic-btn idle';micBtn.textContent='🎤';}
+  }
+}
+
+function decodeHeader(val){if(!val)return null;try{return new TextDecoder('utf-8').decode(new Uint8Array([...val].map(c=>c.charCodeAt(0))));}catch{return val;}}
+function addBubble(label,text,type){
+  const div=document.createElement('div');div.className=`chat-bubble ${type}`;
+  div.innerHTML=`<div class="label">${label}</div>${text}`;
+  chatLog.appendChild(div);chatLog.scrollTop=chatLog.scrollHeight;
+}
+</script>
+</body>
+</html>

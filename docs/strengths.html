@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MOCO — 핵심 강점</title>
+<style>
+  :root{
+    --ink:#1b2340; --muted:#8a93ac; --line:#e6eaf2;
+    --k-bg:#e3e8f0; --k-fg:#67728a;   /* KIRA 하네스 상속 (회색) */
+    --x-bg:#d9e4ff; --x-fg:#2044b0;   /* 확장 (파랑) */
+    --r-bg:#c6ecd4; --r-fg:#136c3c;   /* 재설계 (초록) */
+    --s-bg:#fbe7c7; --s-fg:#96601a;   /* SDK 속성 (앰버) */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{ background:#ffffff; padding:40px; display:flex; justify-content:center;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+    color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .wrap{ width:1180px; }
+  .cap{ font-size:13px; color:var(--muted); margin:0 4px 18px; }
+  .cap b{ color:var(--ink); }
+  .grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px 18px 22px;
+    box-shadow:0 4px 16px rgba(40,60,120,.06); display:flex; flex-direction:column; align-items:center;
+    text-align:center; min-height:212px; }
+  .ico{ width:62px; height:62px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+    font-size:30px; margin-bottom:16px; }
+  .t{ font-weight:700; font-size:15.5px; letter-spacing:-.2px; line-height:1.35; }
+  .badges{ display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin:9px 0 8px; }
+  .otag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; letter-spacing:.2px; }
+  .otag.k{ background:var(--k-bg); color:var(--k-fg); }
+  .otag.x{ background:var(--x-bg); color:var(--x-fg); }
+  .otag.r{ background:var(--r-bg); color:var(--r-fg); }
+  .otag.s{ background:var(--s-bg); color:var(--s-fg); }
+  .s{ color:var(--muted); font-size:12.5px; line-height:1.55; word-break:keep-all; }
+  .legend{ margin:20px 4px 0; font-size:11.5px; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap; }
+  .legend .otag{ margin-right:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cap"><b>MOCO 핵심 강점</b> — 각 타일의 출처 표기: KIRA 하네스 상속 / 확장 / 재설계 / SDK 속성.</div>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="ico" style="background:#efeaff">🧠</div>
+      <div class="t">멀티 에이전트 오케스트레이션</div>
+      <div class="badges"><span class="otag x">확장</span></div>
+      <div class="s">단일 operator → 7 도메인 전문가 위임</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#e6f8ee">⚡</div>
+      <div class="t">Session Lane 동시성</div>
+      <div class="badges"><span class="otag r">재설계</span></div>
+      <div class="s">대화 단위 직렬 보장 + 대화 간 병렬</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#fdf3d8">📁</div>
+      <div class="t">순수 Python 메모리</div>
+      <div class="badges"><span class="otag k">KIRA</span><span class="otag x">검색 확장</span></div>
+      <div class="s">LLM 없이 인덱스·스코어링 즉시 검색</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#f3eafd">🔔</div>
+      <div class="t">능동(Proactive) 시스템</div>
+      <div class="badges"><span class="otag k">KIRA</span></div>
+      <div class="s">요청 전에 먼저 일을 만들어 제안</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#fdeaea">🏭</div>
+      <div class="t">에이전트 자가 생성</div>
+      <div class="badges"><span class="otag x">확장</span></div>
+      <div class="s">MOCO가 새 동료를 만들고 검증·배포 (HITL)</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#e6f8ee">🔌</div>
+      <div class="t">양방향 확장</div>
+      <div class="badges"><span class="otag x">확장</span></div>
+      <div class="s">Skill Marketplace + 자체 MCP 서버</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#fdf3d8">🔑</div>
+      <div class="t">API 키 없는 인증</div>
+      <div class="badges"><span class="otag s">SDK</span><span class="otag x">견고성=확장</span></div>
+      <div class="s">claude CLI 로그인 상속(claude-agent-sdk) · 세마포어·백오프는 확장</div>
+    </div>
+
+    <div class="card">
+      <div class="ico" style="background:#f3eafd">📞</div>
+      <div class="t">멀티 채널 진입</div>
+      <div class="badges"><span class="otag x">확장</span><span class="otag k">Slack=KIRA</span></div>
+      <div class="s">Slack · 웹 챗 · 070 전화 · 음성</div>
+    </div>
+
+  </div>
+
+  <div class="legend">
+    <span><span class="otag k">KIRA</span>하네스 상속</span>
+    <span><span class="otag x">확장</span>이 저장소 신설</span>
+    <span><span class="otag r">재설계</span>KIRA 구조 재설계</span>
+    <span><span class="otag s">SDK</span>claude-agent-sdk 속성</span>
+  </div>
+</div>
+</body>
+</html>

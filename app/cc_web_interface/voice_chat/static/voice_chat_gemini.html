@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOCO Voice — Gemini Live</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0F1117;color:#E2E4E9;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.container{max-width:480px;width:100%;padding:24px;text-align:center}
+.logo{font-size:32px;font-weight:800;background:linear-gradient(135deg,#10B981,#34D399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:#10B98130;color:#34D399;border:1px solid #10B98150;margin-bottom:8px;letter-spacing:0.5px}
+.subtitle{color:#6B7280;font-size:13px;margin-bottom:32px}
+.mic-btn{width:120px;height:120px;border-radius:50%;border:none;cursor:pointer;font-size:48px;transition:all 0.3s;outline:none;position:relative}
+.mic-btn.idle{background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 8px 32px rgba(16,185,129,0.3)}
+.mic-btn.idle:hover{transform:scale(1.05);box-shadow:0 12px 40px rgba(16,185,129,0.4)}
+.mic-btn.active{background:linear-gradient(135deg,#EF4444,#F87171);box-shadow:0 8px 32px rgba(239,68,68,0.4);animation:pulse 1.5s infinite}
+.mic-btn.connecting{background:#374151;cursor:wait;opacity:0.7}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.4)}50%{box-shadow:0 0 0 20px rgba(239,68,68,0)}}
+
+.visualizer{margin-top:20px;height:60px;display:flex;align-items:center;justify-content:center;gap:3px}
+.viz-bar{width:4px;background:linear-gradient(180deg,#10B981,#059669);border-radius:2px;transition:height 0.1s;min-height:4px}
+
+.status{margin-top:16px;font-size:14px;color:#9CA3AF;min-height:20px}
+.status.error{color:#EF4444}
+.status.connected{color:#10B981}
+.status.speaking{color:#F59E0B}
+
+.chat-log{margin-top:24px;text-align:left;max-height:350px;overflow-y:auto;width:100%}
+.chat-bubble{padding:10px 14px;border-radius:14px;margin-bottom:6px;font-size:13px;line-height:1.5;max-width:85%;word-break:break-word}
+.chat-bubble.user{background:#1E293B;margin-left:auto;border-bottom-right-radius:4px}
+.chat-bubble.ai{background:#10B98118;border:1px solid #10B98130;border-bottom-left-radius:4px}
+.chat-bubble.system{background:#374151;text-align:center;max-width:100%;font-size:11px;color:#9CA3AF}
+.chat-bubble .label{font-size:10px;font-weight:600;text-transform:uppercase;color:#6B7280;margin-bottom:3px}
+
+.hint{margin-top:16px;font-size:11px;color:#4B5563;line-height:1.6}
+.compare{margin-top:12px;font-size:11px;color:#6B7280}
+.compare a{color:#10B981;text-decoration:none}
+.compare a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">MOCO Voice</div>
+  <div class="badge">Gemini 3.1 Live</div>
+  <div class="subtitle">실시간 양방향 음성 대화 · 초저지연</div>
+
+  <button class="mic-btn idle" id="micBtn" onclick="toggleSession()">📞</button>
+
+  <div class="visualizer" id="visualizer" style="display:none"></div>
+
+  <div class="status" id="status">대기 중</div>
+
+  <div class="chat-log" id="chatLog"></div>
+  <div class="hint">📞 통화 시작 → 자유롭게 대화 → 종료 버튼<br>끊기 전까지 계속 티키타카 · 종료 시 Slack 전송</div>
+  <div class="compare"><a href="/voice-chat">ElevenLabs + Claude 버전으로 전환</a></div>
+</div>
+
+<script>
+const micBtn = document.getElementById('micBtn');
+const statusEl = document.getElementById('status');
+const chatLog = document.getElementById('chatLog');
+const vizEl = document.getElementById('visualizer');
+
+let ws = null;
+let sessionActive = false;
+let audioCtx = null;
+let recCtx = null;
+let recSource = null;
+let recWorklet = null;
+let analyser = null;
+let nextPlayTime = 0;
+
+// 대화 기록 (Slack 전송용)
+let conversationLog = [];
+// 현재 AI 응답 텍스트 누적 (turn_complete까지 모아서 하나의 버블로)
+let currentAiText = [];
+let currentAiBubble = null;
+// 현재 사용자 입력 텍스트 누적
+let currentUserText = [];
+let currentUserBubble = null;
+
+function getWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}/voice-chat-gemini/ws`;
+}
+
+async function toggleSession() {
+  if (sessionActive) {
+    endSession();
+  } else {
+    startSession();
+  }
+}
+
+async function startSession() {
+  // 초기화
+  conversationLog = [];
+  currentAiText = [];
+  currentAiBubble = null;
+  currentUserText = [];
+  currentUserBubble = null;
+  chatLog.innerHTML = '';
+
+  micBtn.className = 'mic-btn connecting';
+  micBtn.textContent = '⏳';
+  statusEl.textContent = '연결 중...';
+
+  try {
+    ws = new WebSocket(getWsUrl());
+
+    ws.onopen = () => console.log('[WS] Connected');
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      handleServerMessage(msg);
+    };
+
+    ws.onerror = (err) => {
+      console.error('[WS] Error:', err);
+      statusEl.textContent = 'WebSocket 오류';
+      statusEl.className = 'status error';
+      endSession();
+    };
+
+    ws.onclose = () => {
+      console.log('[WS] Closed');
+      if (sessionActive) endSession();
+    };
+  } catch (e) {
+    console.error('Session start error:', e);
+    statusEl.textContent = '연결 실패: ' + e.message;
+    statusEl.className = 'status error';
+    micBtn.className = 'mic-btn idle';
+    micBtn.textContent = '📞';
+  }
+}
+
+function handleServerMessage(msg) {
+  switch (msg.type) {
+    case 'connected':
+      sessionActive = true;
+      micBtn.className = 'mic-btn active';
+      micBtn.textContent = '⏹️';
+      statusEl.textContent = '🟢 연결됨 — 말씀하세요';
+      statusEl.className = 'status connected';
+      addBubble('시스템', '통화가 시작되었습니다. 자유롭게 말씀하세요.', 'system');
+      startMicrophone();
+      initVisualizer();
+      break;
+
+    case 'audio':
+      // AI 응답 오디오 → 재생
+      statusEl.textContent = '🔊 응답 중...';
+      statusEl.className = 'status speaking';
+      const pcmBytes = base64ToArrayBuffer(msg.data);
+      enqueueAudio(pcmBytes);
+      break;
+
+    case 'input_text':
+      // 사용자가 말한 내용 (서버에서 트랜스크립션)
+      if (msg.data && msg.data.trim()) {
+        // 이전 사용자 버블에 이어붙이기 또는 새 버블
+        if (currentUserBubble) {
+          currentUserText.push(msg.data.trim());
+          currentUserBubble.querySelector('.text-content').textContent = currentUserText.join(' ');
+        } else {
+          currentUserText = [msg.data.trim()];
+          currentUserBubble = addBubble('나', msg.data.trim(), 'user');
+        }
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      break;
+
+    case 'text':
+      // AI 응답 텍스트 (트랜스크립션)
+      if (msg.data && msg.data.trim()) {
+        if (currentAiBubble) {
+          currentAiText.push(msg.data.trim());
+          currentAiBubble.querySelector('.text-content').textContent = currentAiText.join(' ');
+        } else {
+          currentAiText = [msg.data.trim()];
+          currentAiBubble = addBubble('Gemini', msg.data.trim(), 'ai');
+        }
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      break;
+
+    case 'turn_complete':
+      // AI 턴 완료 → 대화 기록 저장, 버블 확정
+      if (currentUserText.length > 0) {
+        conversationLog.push({ role: 'user', text: currentUserText.join(' ') });
+      }
+      if (currentAiText.length > 0) {
+        conversationLog.push({ role: 'ai', text: currentAiText.join(' ') });
+      }
+      // 다음 턴 준비
+      currentAiText = [];
+      currentAiBubble = null;
+      currentUserText = [];
+      currentUserBubble = null;
+
+      statusEl.textContent = '🎙️ 말씀하세요...';
+      statusEl.className = 'status connected';
+      break;
+
+    case 'error':
+      statusEl.textContent = '오류: ' + msg.data;
+      statusEl.className = 'status error';
+      break;
+  }
+}
+
+// ── 마이크 ──
+
+async function startMicrophone() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, sampleRate: 16000 }
+    });
+
+    recCtx = new AudioContext({ sampleRate: 16000 });
+    recSource = recCtx.createMediaStreamSource(stream);
+
+    analyser = recCtx.createAnalyser();
+    analyser.fftSize = 256;
+    recSource.connect(analyser);
+
+    await recCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+      class PCMStreamer extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.buffer = [];
+          this.bufferSize = 0;
+          this.chunkSize = 1600;
+        }
+        process(inputs) {
+          const input = inputs[0][0];
+          if (!input) return true;
+          this.buffer.push(new Float32Array(input));
+          this.bufferSize += input.length;
+          if (this.bufferSize >= this.chunkSize) {
+            const merged = new Float32Array(this.bufferSize);
+            let off = 0;
+            for (const b of this.buffer) { merged.set(b, off); off += b.length; }
+            this.buffer = [];
+            this.bufferSize = 0;
+            const int16 = new Int16Array(merged.length);
+            for (let i = 0; i < merged.length; i++) {
+              const s = Math.max(-1, Math.min(1, merged[i]));
+              int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            this.port.postMessage(int16.buffer, [int16.buffer]);
+          }
+          return true;
+        }
+      }
+      registerProcessor('pcm-streamer', PCMStreamer);
+    `], { type: 'application/javascript' })));
+
+    recWorklet = new AudioWorkletNode(recCtx, 'pcm-streamer');
+    recWorklet.port.onmessage = (e) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const b64 = arrayBufferToBase64(e.data);
+        ws.send(JSON.stringify({ type: 'audio', data: b64 }));
+      }
+    };
+    recSource.connect(recWorklet);
+    recWorklet.connect(recCtx.destination);
+
+  } catch (err) {
+    console.error('Microphone error:', err);
+    statusEl.textContent = '마이크 접근 권한이 필요합니다';
+    statusEl.className = 'status error';
+  }
+}
+
+function stopMicrophone() {
+  if (recWorklet) { recWorklet.disconnect(); recWorklet = null; }
+  if (recSource) {
+    recSource.mediaStream.getTracks().forEach(t => t.stop());
+    recSource.disconnect();
+    recSource = null;
+  }
+  analyser = null;
+  if (recCtx) { recCtx.close(); recCtx = null; }
+}
+
+// ── 오디오 재생 (PCM 24kHz 16bit mono) ──
+
+function initAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext({ sampleRate: 24000 });
+  }
+}
+
+function enqueueAudio(pcmArrayBuffer) {
+  initAudioContext();
+  const int16 = new Int16Array(pcmArrayBuffer);
+  const float32 = new Float32Array(int16.length);
+  for (let i = 0; i < int16.length; i++) {
+    float32[i] = int16[i] / 32768;
+  }
+
+  const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+  buffer.copyToChannel(float32, 0);
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+  const startTime = Math.max(now, nextPlayTime);
+  source.start(startTime);
+  nextPlayTime = startTime + buffer.duration;
+}
+
+// ── 시각화 ──
+
+function initVisualizer() {
+  vizEl.style.display = 'flex';
+  vizEl.innerHTML = '';
+  for (let i = 0; i < 24; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'viz-bar';
+    bar.style.height = '4px';
+    vizEl.appendChild(bar);
+  }
+  animateVisualizer();
+}
+
+function animateVisualizer() {
+  if (!sessionActive || !analyser) {
+    vizEl.style.display = 'none';
+    return;
+  }
+  const bars = vizEl.querySelectorAll('.viz-bar');
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(dataArray);
+
+  const step = Math.floor(dataArray.length / bars.length);
+  for (let i = 0; i < bars.length; i++) {
+    const val = dataArray[i * step] || 0;
+    const h = Math.max(4, (val / 255) * 56);
+    bars[i].style.height = h + 'px';
+  }
+  requestAnimationFrame(animateVisualizer);
+}
+
+// ── 세션 종료 ──
+
+async function endSession() {
+  sessionActive = false;
+
+  // 남은 텍스트 기록
+  if (currentUserText.length > 0) {
+    conversationLog.push({ role: 'user', text: currentUserText.join(' ') });
+  }
+  if (currentAiText.length > 0) {
+    conversationLog.push({ role: 'ai', text: currentAiText.join(' ') });
+  }
+  currentAiText = [];
+  currentAiBubble = null;
+  currentUserText = [];
+  currentUserBubble = null;
+
+  // WebSocket 종료
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'end' }));
+    ws.close();
+  }
+  ws = null;
+  stopMicrophone();
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  nextPlayTime = 0;
+
+  micBtn.className = 'mic-btn idle';
+  micBtn.textContent = '📞';
+  vizEl.style.display = 'none';
+
+  // Slack 전송 (폴백 — 서버 측에서도 전송하지만 안전장치)
+  if (conversationLog.length > 0) {
+    statusEl.textContent = 'Slack 전송 중...';
+    const convText = conversationLog.map(e =>
+      `${e.role === 'user' ? '👤 고객' : '🤖 AI'}: ${e.text}`
+    ).join('\n');
+
+    try {
+      await fetch('/voice-chat-gemini/end-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ conversation: convText }),
+      });
+      addBubble('시스템', `✅ 통화 종료 · ${conversationLog.length}턴 대화 기록이 Slack에 전송되었습니다.`, 'system');
+    } catch(e) {
+      addBubble('시스템', '⚠️ Slack 전송 실패', 'system');
+    }
+  } else {
+    addBubble('시스템', '통화가 종료되었습니다.', 'system');
+  }
+
+  statusEl.textContent = '대기 중';
+  statusEl.className = 'status';
+  conversationLog = [];
+}
+
+// ── 유틸리티 ──
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function addBubble(label, text, type) {
+  const div = document.createElement('div');
+  div.className = `chat-bubble ${type}`;
+  div.innerHTML = `<div class="label">${label}</div><span class="text-content">${text}</span>`;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return div;
+}
+</script>
+</body>
+</html>

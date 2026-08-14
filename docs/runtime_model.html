@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MOCO — Runtime Pipeline</title>
+<style>
+  :root{
+    --ink:#1b2340; --muted:#8a93ac; --line:#cfd6e6;
+    --blue:#4460E8; --gold:#8a6d00; --goldBg:#fdf7db; --goldBd:#e9d67d;
+    --navy:#101a3a; --navyCard:#1a2650; --navyBd:#2b3a6b; --navyMut:#9fabd8; --navyLabel:#9db4ff;
+    --purple:#6a2fb0; --purpleBg:#f4ecff; --purpleBd:#ddc7f6;
+    --k-bg:#e3e8f0; --k-fg:#67728a; --x-bg:#d9e4ff; --x-fg:#2044b0; --r-bg:#c6ecd4; --r-fg:#136c3c;
+    --amber:#9a5b00; --amberBg:#fff6e9; --amberBd:#f0d3a6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{ background:#ffffff; padding:44px 40px; display:flex; justify-content:center;
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+    color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .diagram{ width:820px; }
+  .arrow{ width:2px; height:20px; background:var(--line); margin:6px auto; position:relative; }
+  .arrow::after{ content:''; position:absolute; bottom:-2px; left:-4px; border:5px solid transparent; border-top-color:var(--line); }
+  .arrow.dash{ background:none; border-left:2px dashed var(--amberBd); }
+  .arrow.dash::after{ border-top-color:var(--amberBd); }
+
+  .pill{ border-radius:16px; padding:14px 22px; text-align:center; box-shadow:0 6px 18px rgba(40,60,120,.10); }
+  .pill.entry{ background:linear-gradient(180deg,#5570f4,#4460E8); color:#fff; font-weight:700; font-size:16px; width:300px; margin:0 auto; }
+  .pill.done{ background:linear-gradient(180deg,#37ac68,#2e9e5b); color:#fff; font-weight:700; font-size:15.5px; width:260px; margin:0 auto; }
+  .pill.route{ background:var(--goldBg); border:1.5px solid var(--goldBd); width:460px; margin:0 auto; }
+  .pill.route .t{ color:var(--gold); font-weight:700; font-size:15px; }
+  .pill.route .s{ color:#b08e33; font-size:12.5px; margin-top:3px; }
+  .pill.mem{ background:var(--purpleBg); border:1.5px solid var(--purpleBd); width:380px; margin:0 auto; }
+  .pill.mem .t{ color:var(--purple); font-weight:700; font-size:14.5px; }
+  .pill.mem .s{ color:#8b63c0; font-size:12px; margin-top:2px; }
+
+  .zone{ border-radius:20px; padding:16px 18px 18px; }
+  .zone .zl{ font-size:12.5px; font-weight:700; margin:2px 4px 12px; }
+  .zone.green{ background:#f4f6fa; border:1px solid #e2e7f0; }
+  .zone.green .zl{ color:#5a6577; }
+  .zone.dark{ background:var(--navy); box-shadow:0 10px 30px rgba(16,26,58,.28); }
+  .zone.dark .zl{ color:var(--navyLabel); }
+
+  .card{ background:#fff; border-radius:13px; padding:12px 18px; box-shadow:0 2px 8px rgba(40,60,120,.07); }
+  .card + .card{ margin-top:9px; }
+  .card .t{ font-weight:700; font-size:14.5px; color:var(--ink); }
+  .card .s{ color:var(--muted); font-size:12.5px; margin-top:3px; line-height:1.5; }
+  .dcard{ background:var(--navyCard); border:1px solid var(--navyBd); border-radius:13px; padding:12px 18px; }
+  .dcard .t{ font-weight:700; font-size:14.5px; color:#fff; }
+  .dcard .s{ color:var(--navyMut); font-size:12px; margin-top:3px; line-height:1.5; }
+  .dstep{ text-align:center; color:var(--navyMut); font-size:12px; margin:6px 0; font-family:ui-monospace,Menlo,monospace; }
+
+  .branch{ display:flex; gap:12px; }
+  .branch .col{ flex:1; text-align:center; }
+  .branch .bl{ font-size:11.5px; color:var(--muted); margin-bottom:6px; }
+  .bcard{ background:#fff; border:1px solid #e6eaf2; border-radius:12px; padding:12px 10px; box-shadow:0 2px 8px rgba(40,60,120,.05); min-height:74px; }
+  .bcard.hl{ background:#eaf7ef; border-color:#bfe3cc; }
+  .bcard .t{ font-weight:700; font-size:14px; }
+  .bcard .s{ color:var(--muted); font-size:11.5px; margin-top:3px; }
+
+  .optin{ background:var(--amberBg); border:1.5px dashed var(--amberBd); border-radius:18px; padding:14px 16px 16px; }
+  .optin .ol{ font-size:12.5px; font-weight:700; color:var(--amber); margin:2px 2px 12px; }
+  .oflow{ display:flex; align-items:stretch; gap:8px; }
+  .oflow .ob{ flex:1; background:#fff; border:1px solid var(--amberBd); border-radius:11px; padding:10px 8px; text-align:center; }
+  .oflow .ob .t{ font-weight:700; font-size:12.5px; color:#7a4a00; }
+  .oflow .ob .s{ color:#a9834a; font-size:10.5px; margin-top:2px; line-height:1.4; }
+  .oflow .oar{ align-self:center; color:#c79a55; font-weight:700; }
+  .ospec{ display:flex; gap:8px; align-items:center; margin-top:9px; background:#fff; border:1px solid var(--amberBd); border-radius:11px; padding:9px 12px; }
+  .ospec code{ font-size:11px; color:#7a4a00; background:#fbeccd; padding:2px 7px; border-radius:6px; }
+  .ospec .s{ color:#7a4a00; font-size:12px; }
+
+  .otag{ display:inline-block; font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:10px; margin-left:6px; vertical-align:middle; letter-spacing:.2px; }
+  .otag.k{ background:var(--k-bg); color:var(--k-fg); }
+  .otag.x{ background:var(--x-bg); color:var(--x-fg); }
+  .otag.r{ background:var(--r-bg); color:var(--r-fg); }
+  .zone.dark .otag.x{ background:#3350b0; color:#e7ecff; }
+
+  .legend{ text-align:center; color:var(--muted); font-size:11.5px; margin-top:18px; line-height:1.9; }
+  .legend .otag{ margin:0 4px 0 10px; }
+  .legend b{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="diagram">
+
+  <div class="pill entry">Slack 메시지 수신</div>
+  <div class="arrow"></div>
+
+  <div class="zone green">
+    <div class="zl">① 수신 · 진입</div>
+    <div class="card"><div class="t">디바운싱 <span class="otag k">KIRA</span></div><div class="s">끊어 보낸 메시지 병합 · DM 0.5s · 채널 1.5s · 파일 5s</div></div>
+    <div class="card"><div class="t">Session Lane 큐 <span class="otag r">재설계</span></div><div class="s">대화당 단일 워커 · 순서 보장 + 대화 간 병렬 · 락 경합 0</div></div>
+  </div>
+  <div class="arrow"></div>
+
+  <div class="pill route"><div class="t">② 라우팅 결정 <span class="otag k">KIRA</span></div><div class="s">봇 호출? · 인가된 사용자? · 복잡한가?</div></div>
+  <div class="arrow"></div>
+
+  <div class="branch">
+    <div class="col">
+      <div class="bl">봇 호출 아님</div>
+      <div class="bcard"><div class="t">Proactive 제안 <span class="otag k">KIRA</span></div><div class="s">없으면 조용히 종료</div></div>
+    </div>
+    <div class="col">
+      <div class="bl">단순</div>
+      <div class="bcard"><div class="t">Simple Chat <span class="otag k">KIRA</span></div><div class="s">Haiku · 즉답</div></div>
+    </div>
+    <div class="col">
+      <div class="bl">복잡 · 첨부</div>
+      <div class="bcard hl"><div class="t">복잡 판정 <span class="otag k">KIRA</span></div><div class="s">↓ 오케스트레이션</div></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+
+  <div class="zone dark">
+    <div class="zl">③ 멀티에이전트 오케스트레이션 · Sonnet <span class="otag x">확장</span></div>
+    <div class="dcard"><div class="t">오케스트레이터</div><div class="s">Observer 30s 하트비트 · 관련 메모리 검색 · 5분 idle-timeout</div></div>
+    <div class="dstep">call_sub_agent ↓</div>
+    <div class="dcard"><div class="t">7 도메인 서브에이전트 · 병렬 TaskExecutor + TaskWorkspace 공유메모리</div><div class="s">research · communication · code · pm · document · data · web &nbsp;·&nbsp; 각자 필요한 MCP 도구만 화이트리스트</div></div>
+    <div class="dstep">↓</div>
+    <div class="dcard"><div class="t">MCP 도구 실행 · 219+</div><div class="s">Gmail · Google Workspace · Jira · Confluence · ClickUp · CRM · 전화 …</div></div>
+  </div>
+  <div class="arrow"></div>
+
+  <div class="pill done">응답 → Slack <span class="otag k">KIRA</span></div>
+  <div class="arrow"></div>
+
+  <div class="pill mem"><div class="t">④ 비동기 메모리 저장 <span class="otag k">KIRA</span></div><div class="s">워커 10 · 응답을 기다리게 하지 않음</div></div>
+
+  <div class="arrow dash"></div>
+
+  <div class="optin">
+    <div class="ol">opt-in 층 · 기본 off (실선 = 기본 reactive 경로) <span class="otag x">확장</span></div>
+    <div class="oflow">
+      <div class="ob"><div class="t">복잡 + <code style="font-size:10px">PMRV_ENABLED</code></div><div class="s">③ 대체</div></div>
+      <div class="oar">→</div>
+      <div class="ob"><div class="t">Plan</div><div class="s">요구사항 + 서브태스크 DAG</div></div>
+      <div class="oar">→</div>
+      <div class="ob"><div class="t">Map · 병렬</div><div class="s">DAG 독립노드 → TaskExecutor</div></div>
+      <div class="oar">→</div>
+      <div class="ob"><div class="t">Reduce</div><div class="s">종합</div></div>
+      <div class="oar">→</div>
+      <div class="ob"><div class="t">Verify ↻ Replan</div><div class="s">원 요청 대조 · 누락만 재계획</div></div>
+    </div>
+    <div class="ospec"><code>SPEC_VERIFY_ENABLED</code><div class="s">응답 전 요구사항 자기검증</div></div>
+  </div>
+
+  <div class="legend">
+    <b>실선</b> = 기본 reactive 경로 &nbsp;·&nbsp; <b>점선 패널</b> = opt-in 층(기본 off)<br/>
+    <span class="otag k">KIRA</span>하네스 상속 <span class="otag x">확장</span>이 저장소 신설 <span class="otag r">재설계</span>KIRA 구조 재설계
+  </div>
+
+</div>
+</body>
+</html>
